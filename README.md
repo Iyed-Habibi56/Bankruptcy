@@ -1,43 +1,88 @@
+# US Corporate Bankruptcy Analytics & Risk Prediction (1999–2018)
+
+An end-to-end **Python**, **MySQL**, **Power BI**, and **Machine Learning** project analyzing corporate financial distress across **78,682 US company-year records** (`1999–2018`).
+
+---
+
+## Repository Structure
+
+```text
+├── README.md
+├── python/
+│   ├── main.py                        # Data cleaning, ratio engineering & YoY feature pipeline
+│   ├── load_to_mysql.py               # Batch ETL pipeline loading records into MySQL via pymysql
+│   └── prediction.py                  # Out-of-time Random Forest model & future risk scoring
+├── sql/
+│   ├── create_schema.sql              # MySQL star-schema DDL (dim_company, dim_year, fact_company_financials)
+│   ├── alive_vs_failed_company.sql    # Financial metric comparisons between alive and failed firms
+│   ├── avg_ROA.sql                    # Return on assets analysis & rolling window calculations
+│   └── debt_to_assets.sql             # Leverage & distress concentration queries
+├── data/
+│   └── future_failure_predictions.csv # Predicted failure probabilities & risk tiers for alive firms
+└── powerbi/
+    └── Bankruptcy.pdf                 # Exported multi-page Power BI report (All, Alive, and Failed views)
+
 Dataset Overview
-Source: American Bankruptcy Dataset ( american_bankruptcy.csv)
+Dataset: ( company-year rows across ) american_bankruptcy.csv78,6821999–2018
 
-Coverage: 78, 682 company-year observations spanning 1999–2018 (73, 462 aliverecords; 5, 220 failedrecords)
+Status Breakdown: records and records 73,462 alive5,220 failed
 
-Core Fields: 18 raw income-statement and balance-sheet metrics ( total_assets, , , , , , , , , , etc. ) plus company status labels ( / ). total_liabilities current_assets current_liabilities net_income ebit ebitda total_revenue retained_earnings market_valuealivefailed
+Features & Ratios: 18 core financial statement metrics ( total_assets, , , , , , , , , , , etc. ) plus engineered ratios ( , , , , , , ) and year-over-year ( ) changes. total_liabilities current_assets current_liabilities net_income ebit ebitda total_revenue retained_earnings market_valuedebt_to_assets current_ratio roa ebit_margin asset_turnover working_capital_to_assets retained_earnings_to_assetsYoY
 
-Key Components
-1. Python ETL & Feature Engineering ( python/main.py)
-Standardized raw column names and handled missing/infinite ratio edge cases.
+Project Walkthrough
+1. Python Data Pipeline & Machine Learning ( python/& data/)
+python/main.py: Cleans raw financial records, handles edge cases, engineers liquidity/leverage/profitability/efficiency ratios, computes longitudinal failure timelines ( first_fail_year, ), and calculates shifts. years_to_first_failYoY
 
-Engineered core financial health ratios across liquidity,leverage,profitability,and efficiency:
+python/load_to_mysql.py: Connects to MySQL with pymysqland batch-loads the processed company-year records into the database.
 
-Liquidity: working_capital, working_capital_to_assets, current_ratio
-
-Leverage: debt_to_assets, lt_debt_to_liabilities
-
-Profitability & Solvency: roa, gross_margin, ebit_margin, retained_earnings_to_assets
-
-Efficiency: asset_turnover
-
-Computed company-level longitudinal features: first_fail_year, years_to_first_fail,consecutive-year flags,and year-over-year (YoY) deltas for revenue growth,net income,and debt-to-assets.
+python/prediction.py: Trains a RandomForestClassifierwith median imputation and balanced class weights using a time-based split ( 1999–2014train, test) while excluding target-leakage columns ( , ). Scores the latest year of currently companies and outputs ( and / / tiers). 2015–2018first_fail_year years_to_first_failalivedata/future_failure_predictions.csvpredicted_fail_probLow RiskMedium RiskHigh Risk
 
 2. MySQL Star Schema & Analytical SQL ( sql/)
-Designed a normalized star schema bankruptcy_analyticsconsisting of dim_company, , and . dim_yearfact_company_financials
+sql/create_schema.sql: Defines the bankruptcy_analyticsstar schema ( dim_company, , and ). dim_yearfact_company_financials
 
-Built a batch ETL pipeline ( python/load_to_mysql.py) via pymysqlto populate all 78, 682 records.
+sql/alive_vs_failed_company.sql: Contrasts liquidity, profitability, and solvency indicators across healthy vs. distressed companies.
 
-Wrote analytical SQL queries ( sql/02_analytical_queries.sql) comparing alivevs. financial averages, ranking high-leverage distressed firms, and computing 3-year rolling average ROA using SQL window functions ( ). failedAVG() OVER (PARTITION BY ...)
+sql/avg_ROA.sql: Tracks profitability trends and multi-year rolling averages over time.
 
-3. Interactive Power BI Dashboard ( powerbi/bankruptcy_dashboard.pbix)
-Page 1 — All Companies (Macro Overview): Tracks total companies,company-year volume,total revenue,total assets,failure counts,and multi-year trends across 1999–2018.
+sql/debt_to_assets.sql: Highlights high-leverage companies and pre-bankruptcy debt accumulation.
 
-Page 2 — Alive Companies (Healthy Operating Drivers):Analyzes correlations between operating margins (ebit_margin),asset efficiency (asset_turnover),liquidity buffers,androa.
+3. Interactive Power BI Reporting ( powerbi/Bankruptcy.pdf)
+Page 1 — All Companies: Overall scale, company and company-year totals, revenue/asset trends, and failure counts.
 
-Page 3 — Failed Companies (Distress Signals & Countdown): Examines leverage buildup ( debt_to_assets), negative roa, shrinking retained earnings, and the 5-year pre-failure trajectory ( years_to_first_failfrom 5down to 0).
+Page 2 — Alive Companies: Relationships between operating margins, asset turnover, liquidity buffers, and ROA.
 
-Custom DAX Measures: Implemented size-weighted financial ratios ( Weighted Debt to Assets, , , ) to avoid distortion from small-denominator outliers. Weighted Current Ratio Weighted ROA Weighted EBIT Margin
+Page 3 — Failed Companies: Leverage pressure, negative returns, shrinking retained earnings, and the pre-failure countdown ( years_to_first_failfrom 5down to 0) alongside size-weighted DAX measures.
 
-4. Machine Learning Risk Prediction ( python/predict_bankruptcy.py)
-Trained aRandomForestClassifierpipeline (SimpleImputer+ balanced class weights) using a strictout-of-time split(trained on1999–2014,evaluated on 2015–2018) with target-leakage columns excluded.
+How to Run
+Install required Python packages:
 
-Scored the most recent fiscal year of every currently alivecompany to generate predicted_fail_proband assign Low Risk, , and tiers ( ). Medium RiskHigh Riskfuture_failure_predictions.csv
+Bash
+pip install pandas numpy pymysql scikit-learn
+Run data cleaning and feature engineering:
+
+Bash
+python python/main.py
+Initialize the MySQL schema and load data:
+
+Runsql/create_schema.sqlin MySQL Workbench.
+
+Configure your database credentials inpython/load_to_mysql.pyand run:
+
+Bash
+python python/load_to_mysql.py
+Execute the SQL scripts insql/to inspect the query outputs.
+
+Run bankruptcy risk predictions:
+
+Bash
+python python/prediction.py
+View the Power BI report:
+
+Openpowerbi/Bankruptcy.pdfdirectly in GitHub to browse all report pages.
+
+Author
+Iyed Habibi
+
+B.Sc.Computer Science (Data Analysis Track),University of Messina
+
+GitHub•LinkedIn
